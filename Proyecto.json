@@ -1,0 +1,808 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "justificacion-inasistencias",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "88bcef06-84f8-47ee-8534-41b2d722c0f9",
+      "name": "Webhook - Recepción de Formulario",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1168,
+        512
+      ],
+      "webhookId": "justificacion-webhook-001",
+      "notes": "Recibe los datos del formulario web: nombre, ID, correo, motivo e imagen adjunta del estudiante."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer y validar los datos recibidos del formulario\nconst body = $input.first().json.body || $input.first().json;\n\nconst nombre = body.nombre || body.name || '';\nconst estudianteId = body.estudianteId || body.id || '';\nconst correo = body.correo || body.email || '';\nconst motivo = body.motivo || body.reason || '';\nconst archivoBase64 = body.archivo || body.file || '';\nconst tipoArchivo = body.tipoArchivo || body.fileType || 'image/jpeg';\n\n// Validar que los campos obligatorios están presentes\nconst camposFaltantes = [];\nif (!nombre) camposFaltantes.push('nombre');\nif (!estudianteId) camposFaltantes.push('estudianteId');\nif (!correo) camposFaltantes.push('correo');\nif (!motivo) camposFaltantes.push('motivo');\n\nconst esValido = camposFaltantes.length === 0;\nconst timestamp = new Date().toISOString();\nconst solicitudId = 'SOL-' + Date.now();\n\n// Validar formato de archivo\nconst formatosPermitidos = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];\nconst formatoValido = archivoBase64 ? formatosPermitidos.includes(tipoArchivo) : true;\n\nreturn [{\n  json: {\n    solicitudId,\n    nombre,\n    estudianteId,\n    correo,\n    motivo,\n    archivoBase64,\n    tipoArchivo,\n    esValido,\n    formatoValido,\n    camposFaltantes,\n    timestamp,\n    estado: 'en_proceso'\n  }\n}];"
+      },
+      "id": "399aeff6-dedf-4f46-9828-d73703605fa9",
+      "name": "Procesar y Validar Datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        512
+      ],
+      "notes": "Extrae los campos del formulario, valida que estén completos y genera un ID único de solicitud."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.esValido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "leftValue": "={{ $json.formatoValido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3625499b-4544-47b6-9185-a7a9a3c26771",
+      "name": "¿Datos Válidos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        512
+      ],
+      "notes": "Verifica si todos los campos requeridos están presentes y el formato del archivo es correcto."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simular análisis OCR e IA del documento adjunto\nconst datos = $input.first().json;\nconst motivo = datos.motivo.toLowerCase();\nconst tieneArchivo = datos.archivoBase64 && datos.archivoBase64.length > 0;\n\n// Palabras clave por categoría de justificación\nconst palabrasEnfermedad = ['enferm', 'médic', 'medic', 'hospital', 'clínic', 'clinic', 'doctor', 'salud', 'cita', 'urgencia', 'dolor', 'virus', 'covid', 'gripe', 'fiebre'];\nconst palabrasFamiliar = ['familiar', 'familia', 'parent', 'fallec', 'funeral', 'luto', 'accidente', 'madre', 'padre', 'hijo', 'hermano', 'abuelo'];\nconst palabrasLaboral = ['trabajo', 'laboral', 'empresa', 'oficio', 'contrato', 'empleador', 'jefe', 'turno'];\nconst palabrasAcademico = ['académic', 'academic', 'examen', 'concurso', 'congreso', 'representaci', 'universid', 'seminario'];\n\n// Detectar categoría\nlet categoriaDetectada = 'otro';\nlet palabrasEncontradas = [];\n\nfor (const palabra of palabrasEnfermedad) {\n  if (motivo.includes(palabra)) {\n    categoriaDetectada = 'enfermedad';\n    palabrasEncontradas.push(palabra);\n  }\n}\nif (categoriaDetectada === 'otro') {\n  for (const palabra of palabrasFamiliar) {\n    if (motivo.includes(palabra)) {\n      categoriaDetectada = 'emergencia_familiar';\n      palabrasEncontradas.push(palabra);\n    }\n  }\n}\nif (categoriaDetectada === 'otro') {\n  for (const palabra of palabrasLaboral) {\n    if (motivo.includes(palabra)) {\n      categoriaDetectada = 'motivo_laboral';\n      palabrasEncontradas.push(palabra);\n    }\n  }\n}\nif (categoriaDetectada === 'otro') {\n  for (const palabra of palabrasAcademico) {\n    if (motivo.includes(palabra)) {\n      categoriaDetectada = 'motivo_academico';\n      palabrasEncontradas.push(palabra);\n    }\n  }\n}\n\n// Calcular nivel de confianza base\nlet nivelConfianza = 50; // Base\n\n// Aumentar confianza si hay archivo adjunto\nif (tieneArchivo) nivelConfianza += 25;\n\n// Aumentar confianza si hay palabras clave relevantes\nif (palabrasEncontradas.length > 0) nivelConfianza += 15;\nif (palabrasEncontradas.length >= 2) nivelConfianza += 5;\n\n// Reducir confianza si el motivo es muy corto\nif (datos.motivo.length < 20) nivelConfianza -= 20;\nif (datos.motivo.length >= 50) nivelConfianza += 5;\n\n// Asegurar que esté entre 0 y 100\nnivelConfianza = Math.min(100, Math.max(0, nivelConfianza));\n\n// Texto extraído por OCR (simulado)\nconst textoOCR = tieneArchivo \n  ? `Documento procesado. Categoría detectada: ${categoriaDetectada}. Palabras clave encontradas: ${palabrasEncontradas.join(', ') || 'ninguna'}.`\n  : 'No se adjuntó documento de soporte.';\n\n// Clasificación IA\nlet clasificacionIA;\nif (nivelConfianza >= 75) {\n  clasificacionIA = 'valida';\n} else if (nivelConfianza >= 45) {\n  clasificacionIA = 'dudosa';\n} else {\n  clasificacionIA = 'invalida';\n}\n\nreturn [{\n  json: {\n    ...datos,\n    analisisIA: {\n      clasificacionIA,\n      nivelConfianza,\n      categoriaDetectada,\n      palabrasEncontradas,\n      textoOCR,\n      tieneArchivo,\n      fechaAnalisis: new Date().toISOString()\n    }\n  }\n}];"
+      },
+      "id": "bd41363d-417c-407a-a943-4ee4bba6ad07",
+      "name": "Análisis IA + OCR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        416
+      ],
+      "notes": "Analiza el documento adjunto con OCR, detecta palabras clave, categoriza la justificación y asigna un nivel de confianza del 0 al 100%."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.analisisIA.nivelConfianza }}",
+              "rightValue": 75,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "65773892-6b45-4c4c-b46c-fce5b54f5c53",
+      "name": "¿Alta Confianza? (≥75%)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        416
+      ],
+      "notes": "Si el nivel de confianza es 75% o más, el sistema toma decisión automática. De lo contrario, evalúa si es media o baja confianza."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decisión automática para alta confianza\nconst datos = $input.first().json;\nconst clasificacion = datos.analisisIA.clasificacionIA;\n\nlet estadoFinal;\nlet mensajeDecision;\n\nif (clasificacion === 'valida') {\n  estadoFinal = 'aprobado';\n  mensajeDecision = '✅ Su justificación ha sido APROBADA automáticamente. El nivel de confianza del documento es alto y cumple con los requisitos.';\n} else {\n  estadoFinal = 'rechazado';\n  mensajeDecision = '❌ Su justificación ha sido RECHAZADA automáticamente. El documento no cumple con los criterios requeridos.';\n}\n\nreturn [{\n  json: {\n    ...datos,\n    estadoFinal,\n    mensajeDecision,\n    tipoDecision: 'automatica',\n    fechaDecision: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "43c2b07d-ec8b-4ef2-948e-8dcce8d7693f",
+      "name": "Decisión Automática (Alta Confianza)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        304
+      ],
+      "notes": "Con alta confianza (≥75%): aprueba si la IA clasificó como válida, rechaza si clasificó como inválida."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.analisisIA.nivelConfianza }}",
+              "rightValue": 45,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "624c3758-2883-405a-b610-954085d460ab",
+      "name": "¿Confianza Media? (≥45%)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        576
+      ],
+      "notes": "Si el nivel de confianza está entre 45% y 74%, la solicitud pasa a revisión manual por un administrativo."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Confianza media: enviar a revisión manual\nconst datos = $input.first().json;\n\nreturn [{\n  json: {\n    ...datos,\n    estadoFinal: 'en_revision',\n    mensajeDecision: '⏳ Su justificación está EN REVISIÓN MANUAL. Un administrativo revisará su caso y recibirá una respuesta en las próximas 24 horas.',\n    tipoDecision: 'revision_manual',\n    fechaDecision: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "bd5ba831-d024-46af-98ac-bb29c4410391",
+      "name": "Enviar a Revisión Manual",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        512
+      ],
+      "notes": "Confianza media (45%-74%): la solicitud queda en estado 'en revisión' para que un administrativo la evalúe manualmente."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Baja confianza: rechazo preventivo\nconst datos = $input.first().json;\n\nreturn [{\n  json: {\n    ...datos,\n    estadoFinal: 'rechazado',\n    mensajeDecision: '❌ Su justificación fue RECHAZADA preventivamente. El nivel de confianza es bajo. Por favor, adjunte un documento de soporte válido y vuelva a enviar su solicitud.',\n    tipoDecision: 'rechazo_preventivo',\n    fechaDecision: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "fdae223d-ba74-4a05-978c-852f96c70a90",
+      "name": "Rechazo Preventivo (Baja Confianza)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        704
+      ],
+      "notes": "Baja confianza (<45%): la solicitud es rechazada preventivamente y se le pide al estudiante que adjunte documentación válida."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar fila para guardar en Google Sheets\nconst datos = $input.first().json;\nconst analisis = datos.analisisIA || {};\n\nreturn [{\n  json: {\n    solicitudId: datos.solicitudId || '',\n    fechaHora: datos.timestamp || new Date().toISOString(),\n    nombre: datos.nombre || '',\n    estudianteId: datos.estudianteId || '',\n    correo: datos.correo || '',\n    motivo: datos.motivo || '',\n    tieneDocumento: analisis.tieneArchivo ? 'Sí' : 'No',\n    categoriaDetectada: analisis.categoriaDetectada || 'no_detectada',\n    textoOCR: analisis.textoOCR || '',\n    clasificacionIA: analisis.clasificacionIA || '',\n    nivelConfianza: analisis.nivelConfianza || 0,\n    palabrasClave: (analisis.palabrasEncontradas || []).join(', '),\n    tipoDecision: datos.tipoDecision || '',\n    estadoFinal: datos.estadoFinal || '',\n    mensajeDecision: datos.mensajeDecision || ''\n  }\n}];"
+      },
+      "id": "e38c226a-6359-4a79-96b1-d8b0d57f7f72",
+      "name": "Preparar Datos para Google Sheets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        512
+      ],
+      "notes": "Organiza todos los datos en el formato correcto para guardarlos en Google Sheets."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1y6qmmEZmRKO_SZG979Q0xeiK8YFXu_vfHIoVtnfxst8",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Solicitudes",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID Solicitud": "={{ $json.solicitudId }}",
+            "Fecha y Hora": "={{ $json.fechaHora }}",
+            "Nombre": "={{ $json.nombre }}",
+            "ID Estudiante": "={{ $json.estudianteId }}",
+            "Motivo": "={{ $json.motivo }}",
+            "Tiene Documento": "={{ $json.tieneDocumento }}",
+            "Categoría Detectada": "={{ $json.categoriaDetectada }}",
+            "Texto OCR": "={{ $json.textoOCR }}",
+            "Clasificación IA": "=={{ $json.clasificacionIA }}",
+            "Nivel de Confianza (%)": "={{ $json.nivelConfianza }}",
+            "Palabras Clave": "={{ $json.palabrasClave }}",
+            "Tipo de Decisión": "={{ $json.tipoDecision }}",
+            "Estado Final": "={{ $json.estadoFinal }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID Solicitud",
+              "displayName": "ID Solicitud",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fecha y Hora",
+              "displayName": "Fecha y Hora",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nombre",
+              "displayName": "Nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ID Estudiante",
+              "displayName": "ID Estudiante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Correo",
+              "displayName": "Correo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Motivo",
+              "displayName": "Motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tiene Documento",
+              "displayName": "Tiene Documento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Categoría Detectada",
+              "displayName": "Categoría Detectada",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Texto OCR",
+              "displayName": "Texto OCR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Clasificación IA",
+              "displayName": "Clasificación IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nivel de Confianza (%)",
+              "displayName": "Nivel de Confianza (%)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Palabras Clave",
+              "displayName": "Palabras Clave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tipo de Decisión",
+              "displayName": "Tipo de Decisión",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Estado Final",
+              "displayName": "Estado Final",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Mensaje del Estudiante",
+              "displayName": "Mensaje del Estudiante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "5dcca718-fa3a-4c6f-bd6b-cb65130048f2",
+      "name": "Guardar en Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        544,
+        512
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "nFU9Xus2OSuqy6cV",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Guarda todos los datos de la solicitud y el resultado del análisis en la hoja 'Solicitudes' del Google Sheets configurado."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.correo }}",
+        "text": "=🎓 *Sistema de Justificación de Inasistencias*\n\n📋 *Solicitud:* {{ $json.solicitudId }}\n👤 *Estudiante:* {{ $json.nombre }}\n🆔 *ID:* {{ $json.estudianteId }}\n\n📝 *Motivo:* {{ $json.motivo }}\n\n🤖 *Análisis IA:*\n• Clasificación: {{ $json.clasificacionIA }}\n• Nivel de confianza: {{ $json.nivelConfianza }}%\n• Categoría: {{ $json.categoriaDetectada }}\n\n📊 *Resultado:*\n{{ $json.mensajeDecision }}\n\n🕐 Fecha: {{ $json.fechaDecision }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "5c89c952-1c5e-48cc-a1b5-7673aa2caaa5",
+      "name": "Notificación Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        784,
+        512
+      ],
+      "webhookId": "e1c67dc6-5356-48f4-8a0e-fdd28358b22a",
+      "credentials": {
+        "telegramApi": {
+          "id": "LyP4zbh1lENNIAc6",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Envía una notificación al estudiante por Telegram con el resultado de su solicitud, incluyendo el estado final y el nivel de confianza."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"exito\": true,\n  \"solicitudId\": \"{{ $('Preparar Datos para Google Sheets').item.json.solicitudId }}\",\n  \"mensaje\": \"Solicitud recibida y procesada correctamente.\",\n  \"estado\": \"{{ $('Preparar Datos para Google Sheets').item.json.estadoFinal }}\",\n  \"nivelConfianza\": {{ $('Preparar Datos para Google Sheets').item.json.nivelConfianza }}\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "9579b0f6-1ced-4412-9f33-ffce6dba7a5d",
+      "name": "Respuesta HTTP - Éxito",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        512
+      ],
+      "notes": "Devuelve una respuesta HTTP 200 al formulario web confirmando que la solicitud fue procesada exitosamente."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"exito\": false,\n  \"mensaje\": \"Formulario incompleto o formato de archivo no válido.\",\n  \"camposFaltantes\": {{ JSON.stringify($json.camposFaltantes) }},\n  \"formatoValido\": {{ $json.formatoValido }}\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "6b1e270c-ba32-43f3-8854-94b168e0e703",
+      "name": "Respuesta HTTP - Error Validación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        672
+      ],
+      "notes": "Si el formulario tiene campos vacíos o el archivo tiene un formato no válido, responde con error 400 indicando qué falta."
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "=⚠️ *REVISIÓN MANUAL REQUERIDA*\n\n📋 *Solicitud:* {{ $json.solicitudId }}\n👤 *Estudiante:* {{ $json.nombre }}\n🆔 *ID:* {{ $json.estudianteId }}\n📧 *Correo:* {{ $json.correo }}\n\n📝 *Motivo:* {{ $json.motivo }}\n\n🤖 *Análisis IA:*\n• Clasificación: {{ $json.clasificacionIA }}\n• Confianza: {{ $json.nivelConfianza }}% (media)\n• Categoría: {{ $json.categoriaDetectada }}\n\nPor favor revise esta solicitud en Google Sheets.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "09d38827-6d61-4acd-be8a-dc0fed35f659",
+      "name": "Alertar Admin por Revisión Manual",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        304
+      ],
+      "webhookId": "1a0e6ae9-79f3-4cff-909a-db68b53a6526",
+      "credentials": {
+        "telegramApi": {
+          "id": "LyP4zbh1lENNIAc6",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Cuando una solicitud requiere revisión manual, envía una alerta al administrador por Telegram para que la revise."
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "44c48eaf-ed98-4532-817f-12c5a9cc0f81",
+      "name": "Telegram Bot - Consulta de Estado",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1168,
+        816
+      ],
+      "webhookId": "telegram-bot-consulta-001",
+      "credentials": {
+        "telegramApi": {
+          "id": "LyP4zbh1lENNIAc6",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Escucha mensajes del bot de Telegram. Cuando un estudiante escribe su ID de solicitud, el sistema busca su estado."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesar mensaje del bot de Telegram\nconst mensaje = $input.first().json;\nconst texto = mensaje.message?.text || '';\nconst chatId = mensaje.message?.chat?.id;\nconst userId = mensaje.message?.from?.id;\n\n// Comandos disponibles\nlet tipoConsulta = 'desconocido';\nlet parametro = '';\n\nif (texto.startsWith('/estado')) {\n  tipoConsulta = 'consulta_estado';\n  parametro = texto.replace('/estado', '').trim();\n} else if (texto.startsWith('/historial')) {\n  tipoConsulta = 'consulta_historial';\n  parametro = texto.replace('/historial', '').trim();\n} else if (texto === '/start' || texto === '/ayuda') {\n  tipoConsulta = 'ayuda';\n} else {\n  // Asumir que es un ID de solicitud directo\n  tipoConsulta = 'consulta_estado';\n  parametro = texto.trim();\n}\n\nreturn [{\n  json: {\n    chatId,\n    userId,\n    textoOriginal: texto,\n    tipoConsulta,\n    parametro\n  }\n}];"
+      },
+      "id": "0ece7291-762f-417e-bee2-25eacc09bb86",
+      "name": "Procesar Consulta Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        816
+      ],
+      "notes": "Interpreta el mensaje del estudiante en Telegram. Detecta si quiere consultar estado (/estado SOL-123), ver historial (/historial) o necesita ayuda (/start)."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1IJp6chVK-EvvPYjzFt_ABMy9T-mtgEwmrz0-u5QU87A",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Solicitudes",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "ID Solicitud",
+              "lookupValue": "={{ $json.parametro }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c408085f-82ac-4325-bc46-95ba00c713e5",
+      "name": "Buscar en Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -688,
+        816
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "nFU9Xus2OSuqy6cV",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "notes": "Busca en Google Sheets la solicitud por su ID para devolver el estado actual al estudiante."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Procesar Consulta Telegram').item.json.chatId }}",
+        "text": "=📊 *Estado de tu solicitud*\n\n🆔 ID: {{ $json['ID Solicitud'] }}\n👤 Estudiante: {{ $json['Nombre'] }}\n📅 Fecha: {{ $json['Fecha y Hora'] }}\n\n📝 *Motivo:* {{ $json['Motivo'] }}\n\n🤖 *Análisis IA:*\n• Clasificación: {{ $json['Clasificación IA'] }}\n• Confianza: {{ $json['Nivel de Confianza (%)'] }}%\n\n📌 *Estado actual:* {{ $json['Estado Final'] }}\n\n💬 {{ $json['Mensaje al Estudiante'] }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "209cabc1-7d07-46ef-a2da-ea927e73987e",
+      "name": "Responder Estado por Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -448,
+        816
+      ],
+      "webhookId": "04bdf856-476e-445f-83ff-7de227e719b8",
+      "credentials": {
+        "telegramApi": {
+          "id": "LyP4zbh1lENNIAc6",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Envía al estudiante por Telegram el estado actualizado de su solicitud buscado en Google Sheets."
+    }
+  ],
+  "connections": {
+    "Webhook - Recepción de Formulario": {
+      "main": [
+        [
+          {
+            "node": "Procesar y Validar Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar y Validar Datos": {
+      "main": [
+        [
+          {
+            "node": "¿Datos Válidos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Datos Válidos?": {
+      "main": [
+        [
+          {
+            "node": "Análisis IA + OCR",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta HTTP - Error Validación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Análisis IA + OCR": {
+      "main": [
+        [
+          {
+            "node": "¿Alta Confianza? (≥75%)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Alta Confianza? (≥75%)": {
+      "main": [
+        [
+          {
+            "node": "Decisión Automática (Alta Confianza)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Confianza Media? (≥45%)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decisión Automática (Alta Confianza)": {
+      "main": [
+        [
+          {
+            "node": "Preparar Datos para Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Confianza Media? (≥45%)": {
+      "main": [
+        [
+          {
+            "node": "Enviar a Revisión Manual",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rechazo Preventivo (Baja Confianza)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar a Revisión Manual": {
+      "main": [
+        [
+          {
+            "node": "Alertar Admin por Revisión Manual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rechazo Preventivo (Baja Confianza)": {
+      "main": [
+        [
+          {
+            "node": "Preparar Datos para Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Datos para Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Guardar en Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Notificación Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notificación Telegram": {
+      "main": [
+        [
+          {
+            "node": "Respuesta HTTP - Éxito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alertar Admin por Revisión Manual": {
+      "main": [
+        [
+          {
+            "node": "Preparar Datos para Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Bot - Consulta de Estado": {
+      "main": [
+        [
+          {
+            "node": "Procesar Consulta Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procesar Consulta Telegram": {
+      "main": [
+        [
+          {
+            "node": "Buscar en Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar en Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Responder Estado por Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0fc89089b1b32e61bfb3aeb62c37f96b035decd3ff5a8cff5d570135ebd5b86b"
+  }
+}
