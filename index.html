@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang='es'>
+<head>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>Justificación de Inasistencia</title>
+  <link rel='stylesheet' href='estilos.css'>
+</head>
+<body>
+  <div class='pagina'>
+    <header class='encabezado'>
+      <h1>📋 Solicitud de Justificación</h1>
+      <p>Completa el formulario. Tu solicitud será revisada en breve.</p>
+    </header>
+
+    <main class='tarjeta' id='contenedor-form'>
+      <form id='formulario-justificacion' enctype='multipart/form-data' novalidate>
+
+        <div class='campo'>
+          <label for='nombre'>Nombre Completo *</label>
+          <input type='text' id='nombre' name='nombre' required
+                 pattern='[A-Za-zÁÉÍÓÚáéíóúñÑ ]+' maxlength='80'
+                 placeholder='Ej: María Alejandra Torres'>
+          <span class='error' id='err-nombre'></span>
+        </div>
+
+        <div class='campo'>
+          <label for='id_estudiante'>Código / Matrícula *</label>
+          <input type='text' id='id_estudiante' name='id_estudiante' required
+                 pattern='[0-9]{5,12}' maxlength='12'
+                 placeholder='Ej: 20230145'>
+          <span class='error' id='err-id'></span>
+        </div>
+
+        <div class='campo'>
+          <label for='correo'>Correo Electrónico *</label>
+          <input type='email' id='correo' name='correo' required
+                 placeholder='Ej: maria@correo.com'>
+          <span class='error' id='err-correo'></span>
+        </div>
+
+        <div class='campo'>
+          <label for='fecha_ausencia'>Fecha de la Inasistencia *</label>
+          <input type='date' id='fecha_ausencia' name='fecha_ausencia' required>
+          <span class='error' id='err-fecha'></span>
+        </div>
+
+        <div class='campo'>
+          <label for='motivo'>Tipo de Motivo *</label>
+          <select id='motivo' name='motivo' required>
+            <option value=''>-- Selecciona una opción --</option>
+            <option value='cita_medica'>Cita médica programada</option>
+            <option value='enfermedad'>Enfermedad o malestar</option>
+            <option value='urgencia_familiar'>Urgencia familiar</option>
+            <option value='calamidad'>Calamidad doméstica</option>
+            <option value='tramite_oficial'>Trámite oficial / judicial</option>
+            <option value='otro'>Otro motivo</option>
+          </select>
+          <span class='error' id='err-motivo'></span>
+        </div>
+
+        <div class='campo'>
+          <label for='descripcion'>Descripción Detallada *</label>
+          <textarea id='descripcion' name='descripcion' required
+                    rows='4' maxlength='500'
+                    placeholder='Explica con detalle el motivo de tu inasistencia...'></textarea>
+          <span class='contador' id='cont-desc'>0 / 500</span>
+          <span class='error' id='err-desc'></span>
+        </div>
+
+        <div class='campo'>
+          <label for='soporte'>Documento de Soporte (PDF, JPG, PNG — máx. 5MB)</label>
+          <input type='file' id='soporte' name='soporte' accept='.pdf,.jpg,.jpeg,.png'>
+          <span class='error' id='err-soporte'></span>
+        </div>
+
+        <button type='submit' class='btn-enviar' id='btn-enviar'>
+          Enviar Solicitud
+        </button>
+      </form>
+    </main>
+
+    <div class='resultado' id='resultado' style='display:none;'></div>
+  </div>
+
+  <script src='envios.js'></script>
+</body>
+</html>

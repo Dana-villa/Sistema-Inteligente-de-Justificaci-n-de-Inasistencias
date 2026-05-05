@@ -1,0 +1,95 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 50%, #a5d6a7 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.pagina { width: 100%; max-width: 640px; }
+
+.encabezado {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #1b5e20;
+}
+.encabezado h1 { font-size: 1.7rem; margin-bottom: 6px; }
+.encabezado p  { font-size: 0.95rem; color: #2e7d32; }
+
+.tarjeta {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 36px 40px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+
+.campo { margin-bottom: 18px; display: flex; flex-direction: column; }
+
+label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #2e7d32;
+  margin-bottom: 6px;
+}
+
+input, select, textarea {
+  border: 2px solid #c8e6c9;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  background: #f9fbe7;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #43a047;
+  box-shadow: 0 0 0 3px rgba(67,160,71,0.18);
+  background: #ffffff;
+}
+
+input.invalido, select.invalido, textarea.invalido {
+  border-color: #e53935;
+  background: #fff8f8;
+}
+
+textarea { resize: vertical; }
+
+.error { color: #c62828; font-size: 0.78rem; margin-top: 4px; min-height: 16px; }
+.contador { font-size: 0.75rem; color: #888; text-align: right; margin-top: 2px; }
+
+.btn-enviar {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(90deg, #2e7d32, #43a047);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: opacity 0.2s, transform 0.1s;
+  margin-top: 8px;
+}
+.btn-enviar:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-enviar:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.resultado {
+  margin-top: 20px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+.resultado.exito { background: #e8f5e9; color: #1b5e20; border: 2px solid #a5d6a7; }
+.resultado.error { background: #ffebee; color: #b71c1c; border: 2px solid #ef9a9a; }
+
+@media (max-width: 480px) {
+  .tarjeta { padding: 24px 20px; }
+  .encabezado h1 { font-size: 1.4rem; }
+}

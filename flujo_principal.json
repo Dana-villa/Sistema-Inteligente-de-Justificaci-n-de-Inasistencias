@@ -1,0 +1,657 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "justificacion",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        112
+      ],
+      "id": "04743145-8e21-4ff9-bb50-9728efaa808a",
+      "name": "Webhook",
+      "webhookId": "0e728c6a-a348-4759-8ec2-2f78cf8a3433"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0e781a97-4481-4557-a8f7-a49b848d1526",
+              "name": "nombre",
+              "value": "={{ $json.body.nombre }}",
+              "type": "string"
+            },
+            {
+              "id": "a66b2ef0-3d81-48e1-a93a-a6c8541f90eb",
+              "name": "id_estudiante ",
+              "value": "={{ $json.body.id_estudiante }}",
+              "type": "string"
+            },
+            {
+              "id": "5396ddc0-be64-4d00-ae06-553157f0485b",
+              "name": "correo",
+              "value": "={{ $json.body.correo }}",
+              "type": "string"
+            },
+            {
+              "id": "3979b275-0739-4910-8821-1d25e2f09c02",
+              "name": "fecha_ausencia",
+              "value": "={{ $json.body.fecha_ausencia }}",
+              "type": "string"
+            },
+            {
+              "id": "b827acd6-edb3-4400-9b68-02d2db42f230",
+              "name": "motivo",
+              "value": "={{ $json.body.motivo }}",
+              "type": "string"
+            },
+            {
+              "id": "bdab7a4f-b05e-4358-8d2f-517187973c7c",
+              "name": "descripcion",
+              "value": "={{ $json.body.descripcion }}",
+              "type": "string"
+            },
+            {
+              "id": "dacc94ad-570f-4e06-95cc-cf674a3168d5",
+              "name": "id_solicitud   ",
+              "value": "=REQ-{{ $now.format('yyyyMMdd') }}-{{ $randomString(6) }}",
+              "type": "string"
+            },
+            {
+              "id": "245f9758-0fe0-4419-851e-566697cec445",
+              "name": "tiene_archivo",
+              "value": "={{ $binary.soporte ? 'Sí' : 'No' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        112
+      ],
+      "id": "74a99009-c109-4cfc-ae92-b42ca2ed51d5",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres un sistema de validación académica. Analiza la siguiente solicitud de justificación\nde inasistencia y determina si es válida.\n\nDATOS DEL ESTUDIANTE:\n- Nombre: {{ $json.nombre }}\n- Código: {{ $json.id_estudiante }}\n- Fecha de ausencia: {{ $json.fecha_ausencia }}\n- Motivo seleccionado: {{ $json.motivo }}\n- Descripción del estudiante: {{ $json.descripcion }}\n\nCRITERIOS DE EVALUACIÓN:\n- VÁLIDA: El motivo es legítimo, la descripción es coherente con el motivo declarado,\n  hay consistencia interna y el lenguaje es apropiado.\n- INVÁLIDA: El motivo no justifica una ausencia académica, la descripción es\n  incoherente, contradictoria, vacía o claramente inventada.\n- DUDOSA: Hay elementos que requieren verificación documental o el caso es ambiguo.\n\nResponde ÚNICAMENTE con un objeto JSON con esta estructura exacta (sin texto adicional,\nsin bloques de código, sin explicaciones fuera del JSON):\n{\n  \"clasificacion\": \"VÁLIDA\" o \"INVÁLIDA\" o \"DUDOSA\",\n  \"confianza\": número entre 0.0 y 1.0,\n  \"razonamiento\": \"explicación breve en máximo 2 oraciones\"\n}\n",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        448,
+        -16
+      ],
+      "id": "4bfe5550-c162-461a-89ec-c807e52142ba",
+      "name": "Basic LLM Chain",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite-preview",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        224
+      ],
+      "id": "37a496c2-75bc-48e5-8efe-bef8960be619",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "TW8msl8X2RWaSxbo",
+          "name": "Gemini - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"clasificacion\": {\n      \"type\": \"string\",\n      \"enum\": [\"VÁLIDA\", \"INVÁLIDA\", \"DUDOSA\"]\n    },\n    \"confianza\": {\n      \"type\": \"number\",\n      \"minimum\": 0,\n      \"maximum\": 1\n    },\n    \"razonamiento\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\"clasificacion\", \"confianza\", \"razonamiento\"]\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        224
+      ],
+      "id": "629d68c3-1314-4ec1-bc00-8a5d63190530",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        800,
+        128
+      ],
+      "id": "843b7fd7-7d46-43fe-91ae-767e5beb24a4",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1JGXb84xauDZ6UMnH6R4PEsCGkcUj-iPMYbUq98VHoGw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Solicitudes",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Solicitud": "={{ $json['id_solicitud   '] }}",
+            "Nombre": "={{ $json.nombre }}",
+            "ID_Estudiante": "={{ $json['id_estudiante '] }}",
+            "Correo": "={{ $json.correo }}",
+            "Fecha_Ausencia": "={{ $json.fecha_ausencia }}",
+            "Motivo": "={{ $json.motivo }}",
+            "Descripcion": "={{ $json.descripcion }}",
+            "Archivo_Soporte": "={{ $json.tiene_archivo }}",
+            "Clasificacion_IA": "={{ $json.output.clasificacion }}",
+            "Confianza_IA": "={{ $json.output.confianza }}",
+            "Razonamiento_IA": "={{ $json.output.razonamiento }}",
+            "Fecha_Registro": "={{ $now.toISO() }}",
+            "Estado_FInal": "PENDIENTE"
+          },
+          "matchingColumns": [
+            "ID_Solicitud"
+          ],
+          "schema": [
+            {
+              "id": "ID_Solicitud",
+              "displayName": "ID_Solicitud",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nombre",
+              "displayName": "Nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ID_Estudiante",
+              "displayName": "ID_Estudiante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Correo",
+              "displayName": "Correo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fecha_Ausencia",
+              "displayName": "Fecha_Ausencia",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Motivo",
+              "displayName": "Motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Descripcion",
+              "displayName": "Descripcion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Archivo_Soporte",
+              "displayName": "Archivo_Soporte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Clasificacion_IA",
+              "displayName": "Clasificacion_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Confianza_IA",
+              "displayName": "Confianza_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Razonamiento_IA",
+              "displayName": "Razonamiento_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Estado_FInal",
+              "displayName": "Estado_FInal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fecha_Registro",
+              "displayName": "Fecha_Registro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1024,
+        128
+      ],
+      "id": "b7d41bc7-0de5-4c9e-b940-4ed976e12851",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u4WIrXsiqUntBF7Y",
+          "name": "Google Sheets - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Clasificacion_IA }}",
+                    "rightValue": "VALIDA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "77539407-aea2-4e17-88ef-1bd4df58d76c"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cb1201d0-126a-48e1-868f-4b8a807933a9",
+                    "leftValue": "={{ $json.Clasificacion_IA }}",
+                    "rightValue": "INVÁLIDA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "12f40e91-8959-431f-8b2b-ffeba1d9ef07",
+                    "leftValue": "={{ $json.Clasificacion_IA }}",
+                    "rightValue": "DUDOSA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1472,
+        96
+      ],
+      "id": "fcf9a76f-4d21-4297-acb2-8955d079e502",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "5517523324",
+        "message": "=  ✅ Solicitud APROBADA automáticamente\n  ID: {{ $json.id_solicitud }}\n  Estudiante: {{ $json.nombre }} ({{ $json.id_estudiante }})\n  Motivo: {{ $json.motivo }}\n  Confianza IA: {{ ($json.confianza * 100).toFixed(0) }}%\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        -64
+      ],
+      "id": "211d3c19-76eb-4d12-9662-701143c46ea8",
+      "name": "Send message and wait for response",
+      "webhookId": "22dcad21-7814-42c1-b7bb-4aead7dd16aa",
+      "credentials": {
+        "telegramApi": {
+          "id": "ehobeJkvwlIjt0AM",
+          "name": "Telegram Bot - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "=🔍 *SOLICITUD REQUIERE REVISIÓN MANUAL*  📋 *Datos del Estudiante:* - Nombre: {{ $json.nombre }} - Código: {{ $json.id_estudiante }} - Fecha de ausencia: {{ $json.fecha_ausencia }} - Motivo: {{ $json.motivo }} - Descripción: {{ $json.descripcion }}  🤖 *Análisis de IA:* - Clasificación: {{ $json.clasificacion }} - Confianza: {{ $json.confianza }} - Razonamiento: {{ $json.razonamiento }}  📌 ID Solicitud: `{{ $json.id_solicitud }}`  Por favor revisa y decide:",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ VÁLIDA",
+                    "additionalFields": {
+                      "callback_data": "=VALIDA_{{ $json.id_solicitud }}"
+                    }
+                  },
+                  {
+                    "text": "❌ INVÁLIDA",
+                    "additionalFields": {
+                      "callback_data": "=INVALIDA_{{ $json.id_solicitud }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "MarkdownV2"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        288
+      ],
+      "id": "414f22ac-c75e-4aca-80ab-a5fbf2389b02",
+      "name": "Send a text message",
+      "webhookId": "6351bc06-09e6-4613-9e11-1a9452f8ee8a",
+      "credentials": {
+        "telegramApi": {
+          "id": "ehobeJkvwlIjt0AM",
+          "name": "Telegram Bot - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n    \"id_solicitud\": \"{{ $json.id_solicitud }}\",\n    \"mensaje\": \"Solicitud recibida. Te notificaremos pronto por Telegram.\"\n\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1248,
+        128
+      ],
+      "id": "24324631-e86d-4e28-8f1d-db269e3bb47b",
+      "name": "Response Code: 200"
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "a",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        112
+      ],
+      "id": "0ac0a106-dc56-4395-8ae6-d4e1c8a5d869",
+      "name": "Send a text message1",
+      "webhookId": "cc217b62-af57-420a-90c4-56d4921fd236",
+      "credentials": {
+        "telegramApi": {
+          "id": "ehobeJkvwlIjt0AM",
+          "name": "Telegram Bot - Justificaciones"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Response Code: 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Code: 200": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0fc89089b1b32e61bfb3aeb62c37f96b035decd3ff5a8cff5d570135ebd5b86b"
+  }
+}

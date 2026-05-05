@@ -1,0 +1,788 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        192
+      ],
+      "id": "8ea185d0-708b-4ac0-9154-fab82bab1866",
+      "name": "Telegram Trigger",
+      "webhookId": "087183d0-96a2-4fdf-a67a-c4345c03cee4",
+      "credentials": {
+        "telegramApi": {
+          "id": "ehobeJkvwlIjt0AM",
+          "name": "Telegram Bot - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/consulta",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "ae352667-c050-4038-ba10-11fec68a916b"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "94903744-7acd-49d0-a29c-fb342993adb7",
+                    "leftValue": "= {{ $json.callback_query.data }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        192
+      ],
+      "id": "9ea29762-e777-4836-9b7a-7214e82afa5f",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c976a619-8b88-4e2b-90f9-d1d8edb98740",
+              "name": "id_buscado",
+              "value": "={{ $json.message.text.split(' ')[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "58392fa3-67de-4e07-889c-61fc7ea3a74a",
+              "name": "chat_id",
+              "value": "={{ $('Edit Fields').item.json.chat_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a2372784-1978-4628-be5a-29704838f1df",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1JGXb84xauDZ6UMnH6R4PEsCGkcUj-iPMYbUq98VHoGw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Solicitudes",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "ID_Solicitud",
+              "lookupValue": "={{ $json.id_buscado }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        0
+      ],
+      "id": "93d017da-cb99-41fe-a9c6-9383b00ab2d6",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u4WIrXsiqUntBF7Y",
+          "name": "Google Sheets - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "=resultados de la fila encontrada en Sheets formateados.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "3bf4bc5b-ee06-4c2c-b5bd-a255d336598f",
+      "name": "Send a text message",
+      "webhookId": "4972406c-0b1e-4790-b2ba-94580192e0b2",
+      "credentials": {
+        "telegramApi": {
+          "id": "ehobeJkvwlIjt0AM",
+          "name": "Telegram Bot - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "acdc5d2c-808d-43de-b972-b62178f7a1c4",
+              "name": "callback_data",
+              "value": "={{ $json.callback_query.data }}",
+              "type": "string"
+            },
+            {
+              "id": "3cffcca3-aa78-4fd1-aebd-1da9b9b76384",
+              "name": "desicion",
+              "value": "={{ $json.callback_query.data.split('_')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "0ea57b1a-79da-4e32-8ab4-2301a170b86a",
+              "name": "id_solicitud",
+              "value": "={{ $json.callback_query.data.split('_').slice(1).join('_') }}",
+              "type": "string"
+            },
+            {
+              "id": "d272ab31-fca7-4853-bec4-af31d9a5b68c",
+              "name": "chat_id",
+              "value": "={{ $json.callback_query.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "69c191f0-4122-4b45-b9f5-9e5d973cad4c",
+              "name": "message_id     ",
+              "value": "={{ $json.callback_query.message.message_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        288
+      ],
+      "id": "64663c0e-36b0-4110-b6cc-02c152331484",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "decision",
+                    "rightValue": "VALIDA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "979ac638-d20f-4edc-a875-4b566f6d2e7f"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "51ef784b-19ed-444d-897a-e2725d2d6f03",
+                    "leftValue": "decision",
+                    "rightValue": "INVALIDA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        288
+      ],
+      "id": "3831acfb-fbf8-42f8-a9ff-06f258f30c09",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1JGXb84xauDZ6UMnH6R4PEsCGkcUj-iPMYbUq98VHoGw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Solicitudes",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Solicitud": "={{ $json.id_solicitud }}",
+            "Estado_FInal": "VÁLIDA"
+          },
+          "matchingColumns": [
+            "ID_Solicitud"
+          ],
+          "schema": [
+            {
+              "id": "ID_Solicitud",
+              "displayName": "ID_Solicitud",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nombre",
+              "displayName": "Nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ID_Estudiante",
+              "displayName": "ID_Estudiante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Correo",
+              "displayName": "Correo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Fecha_Ausencia",
+              "displayName": "Fecha_Ausencia",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Motivo",
+              "displayName": "Motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Descripcion",
+              "displayName": "Descripcion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Archivo_Soporte",
+              "displayName": "Archivo_Soporte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Clasificacion_IA",
+              "displayName": "Clasificacion_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Confianza_IA",
+              "displayName": "Confianza_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Razonamiento_IA",
+              "displayName": "Razonamiento_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Estado_FInal",
+              "displayName": "Estado_FInal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fecha_Registro",
+              "displayName": "Fecha_Registro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        192
+      ],
+      "id": "f3e85c31-6070-447e-9ff9-cdc845a66d51",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u4WIrXsiqUntBF7Y",
+          "name": "Google Sheets - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1JGXb84xauDZ6UMnH6R4PEsCGkcUj-iPMYbUq98VHoGw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Solicitudes",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_Solicitud": "={{ $json.id_solicitud }}",
+            "Estado_FInal": "INVÁLIDA"
+          },
+          "matchingColumns": [
+            "ID_Solicitud"
+          ],
+          "schema": [
+            {
+              "id": "ID_Solicitud",
+              "displayName": "ID_Solicitud",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Nombre",
+              "displayName": "Nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ID_Estudiante",
+              "displayName": "ID_Estudiante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Correo",
+              "displayName": "Correo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Fecha_Ausencia",
+              "displayName": "Fecha_Ausencia",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Motivo",
+              "displayName": "Motivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Descripcion",
+              "displayName": "Descripcion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Archivo_Soporte",
+              "displayName": "Archivo_Soporte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Clasificacion_IA",
+              "displayName": "Clasificacion_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Confianza_IA",
+              "displayName": "Confianza_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Razonamiento_IA",
+              "displayName": "Razonamiento_IA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Estado_FInal",
+              "displayName": "Estado_FInal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Fecha_Registro",
+              "displayName": "Fecha_Registro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        384
+      ],
+      "id": "44868e62-dbdc-4b7b-9f06-aecf288b7801",
+      "name": "Update row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u4WIrXsiqUntBF7Y",
+          "name": "Google Sheets - Justificaciones"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "=✅ Solicitud *{{ $json.id_solicitud }}* \nactualizada a *{{ $json.decision }}* correctamente.\n\n📋 Resumen:\n- ID: {{ $json.id_solicitud }}\n- Decisión: {{ $json.decision }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        288
+      ],
+      "id": "a7ad73c8-248d-43b9-9e38-44fcff4e2954",
+      "name": "Send a text message1",
+      "webhookId": "0406c4fa-dd5b-440b-957e-f7436a0a2a5d",
+      "credentials": {
+        "telegramApi": {
+          "id": "ehobeJkvwlIjt0AM",
+          "name": "Telegram Bot - Justificaciones"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0fc89089b1b32e61bfb3aeb62c37f96b035decd3ff5a8cff5d570135ebd5b86b"
+  }
+}
