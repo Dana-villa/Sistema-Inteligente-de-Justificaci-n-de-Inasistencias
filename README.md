@@ -1,293 +1,159 @@
-# 🎓 Sistema Inteligente de Justificación de Inasistencias
+# 📋 Sistema de Justificación de Inasistencias
 
-> Flujo automatizado en **n8n** que procesa, analiza y gestiona las solicitudes de justificación de inasistencias de estudiantes usando IA, OCR simulado, Google Sheets y Telegram.
-
----
-
-## 📋 Descripción General
-
-Este sistema recibe solicitudes de justificación de inasistencias a través de un formulario web, analiza los documentos adjuntos con inteligencia artificial, toma decisiones automáticas o envía los casos a revisión manual, notifica al estudiante y al administrador por Telegram, y registra todo en Google Sheets.
+Sistema automatizado para la recepción, evaluación con IA y gestión de solicitudes de justificación de inasistencia estudiantil. Integra un formulario web con flujos de automatización en **n8n**, **Google Gemini**, **Google Sheets** y **Telegram**.
 
 ---
 
-## 🏗️ Arquitectura del Flujo
+## 📁 Estructura del Proyecto
 
-El flujo está dividido en **dos pipelines independientes**:
-
-### Pipeline 1 — Procesamiento de Solicitudes (Webhook)
 ```
-Webhook → Validar Datos → Análisis IA+OCR → Decisión (Auto/Manual/Rechazo)
-       → Google Sheets → Notificación Telegram → Respuesta HTTP
-```
-
-### Pipeline 2 — Consulta de Estado (Telegram Bot)
-```
-Telegram Bot → Procesar Consulta → Buscar en Google Sheets → Responder por Telegram
+├── index.html              # Formulario web de solicitud
+├── estilos.css             # Estilos del formulario
+├── envios.js               # Lógica de validación y envío al webhook
+├── flujo_principal.json    # Flujo n8n: recepción y evaluación IA
+└── flujo_confirmacion.json # Flujo n8n: gestión de respuestas del docente
 ```
 
 ---
 
-## 🔁 Nodos del Flujo
+## ⚙️ Cómo Funciona
 
-### 1. `Webhook - Recepción de Formulario`
-- **Tipo:** Webhook (POST)
-- **Ruta:** `/justificacion-inasistencias`
-- **Descripción:** Recibe los datos del formulario web: nombre, ID estudiante, correo, motivo e imagen/documento adjunto en base64.
+El sistema opera en dos etapas automatizadas mediante flujos n8n independientes.
+
+### Flujo 1 — Recepción y Evaluación (`flujo_principal.json`)
+
+```
+Webhook → Edit Fields → Basic LLM Chain (Gemini) → Merge
+       → Append/Update Google Sheets → Response 200
+       → Switch → [Telegram: Notificación al docente]
+```
+
+1. **Webhook** recibe el `POST` del formulario en `/webhook/justificacion` con los datos del estudiante y el archivo adjunto opcional.
+2. **Edit Fields** extrae y normaliza los campos: nombre, código, correo, fecha de ausencia, motivo, descripción, y genera un `id_solicitud` único con formato `REQ-YYYYMMDD-XXXXXX`.
+3. **Basic LLM Chain** (modelo Google Gemini) evalúa la solicitud con el siguiente prompt estructurado:
+   - Analiza coherencia entre motivo y descripción.
+   - Clasifica la solicitud como `VÁLIDA`, `INVÁLIDA` o `DUDOSA`.
+   - Devuelve un JSON con `clasificacion`, `confianza` (0.0–1.0) y `razonamiento`.
+4. **Structured Output Parser** garantiza que la respuesta de Gemini sea un JSON válido.
+5. **Merge** combina los datos del formulario con el resultado del análisis de IA.
+6. **Append or Update Google Sheets** registra la solicitud completa (incluyendo clasificación IA) en la hoja de cálculo.
+7. **Response Code 200** devuelve el `id_solicitud` al formulario web para confirmación inmediata al estudiante.
+8. **Switch** enruta la notificación Telegram según la clasificación:
+   - `VÁLIDA` → Mensaje directo al docente informando aprobación sugerida.
+   - `INVÁLIDA` → Mensaje directo informando rechazo sugerido.
+   - `DUDOSA` → Mensaje con botón interactivo solicitando decisión manual al docente.
 
 ---
 
-### 2. `Procesar y Validar Datos`
-- **Tipo:** Code (JavaScript)
-- **Descripción:** Extrae los campos del cuerpo de la solicitud, valida que estén completos y genera un ID único de solicitud (`SOL-<timestamp>`).
-- **Campos requeridos:** `nombre`, `estudianteId`, `correo`, `motivo`
-- **Formatos de archivo permitidos:** `image/jpeg`, `image/png`, `image/jpg`, `application/pdf`
+### Flujo 2 — Gestión de Respuestas del Docente (`flujo_confirmacion.json`)
+
+```
+Telegram Trigger → Switch
+  ├── [Consulta] → Edit Fields → Get row(s) in sheet → Send a text message
+  └── [Decisión] → Edit Fields1 → Switch1
+                     ├── Update row in sheet  (Aprobado)
+                     └── Update row in sheet1 (Rechazado)
+                   → Send a text message1
+```
+
+1. **Telegram Trigger** escucha mensajes del docente, incluyendo respuestas a botones (`callback_query`) y mensajes de texto.
+2. **Switch** distingue entre:
+   - **Consulta de solicitud** (output 0): el docente solicita ver los detalles de una solicitud por ID.
+   - **Decisión sobre solicitud** (output 1): el docente aprueba o rechaza una solicitud.
+3. **Rama de consulta:**
+   - Edit Fields extrae el ID de solicitud del mensaje.
+   - Get row(s) in sheet busca la fila correspondiente en Google Sheets.
+   - Send a text message devuelve los detalles al docente vía Telegram.
+4. **Rama de decisión:**
+   - Edit Fields1 normaliza la decisión recibida.
+   - Switch1 separa entre aprobación y rechazo.
+   - Update row in sheet / Update row in sheet1 actualiza el estado en Google Sheets.
+   - Send a text message1 notifica al docente la confirmación del cambio.
 
 ---
 
-### 3. `¿Datos Válidos?`
-- **Tipo:** IF (condicional)
-- **Condición:** `esValido === true AND formatoValido === true`
-- **✅ Verdadero →** Continúa al análisis IA
-- **❌ Falso →** Respuesta HTTP 400 con detalle de campos faltantes
+## 🌐 Formulario Web
+
+El formulario (`index.html` + `estilos.css` + `envios.js`) permite al estudiante enviar su solicitud con los siguientes campos:
+
+| Campo | Tipo | Validación |
+|---|---|---|
+| Nombre completo | Texto | Solo letras y espacios, obligatorio |
+| Código / Matrícula | Texto | 5–12 dígitos numéricos |
+| Correo electrónico | Email | Formato válido |
+| Fecha de inasistencia | Fecha | Obligatorio |
+| Tipo de motivo | Selección | Cita médica, enfermedad, urgencia familiar, calamidad, trámite oficial, otro |
+| Descripción detallada | Textarea | Mínimo 20 caracteres, máximo 500 |
+| Documento de soporte | Archivo | PDF, JPG, PNG — máximo 5 MB (opcional) |
+
+Al enviarse con éxito, el formulario muestra el `id_solicitud` generado e informa al estudiante que recibirá una notificación por Telegram.
 
 ---
 
-### 4. `Análisis IA + OCR`
-- **Tipo:** Code (JavaScript)
-- **Descripción:** Simula un análisis OCR e IA del documento adjunto. Detecta palabras clave por categoría y calcula un nivel de confianza del 0 al 100%.
+## 🛠️ Tecnologías Utilizadas
 
-**Categorías detectadas:**
-| Categoría | Palabras clave |
+| Componente | Tecnología |
 |---|---|
-| `enfermedad` | médico, hospital, clínica, doctor, covid, fiebre... |
-| `emergencia_familiar` | familia, fallecimiento, funeral, accidente... |
-| `motivo_laboral` | trabajo, empresa, contrato, empleador... |
-| `motivo_academico` | examen, congreso, seminario, universidad... |
-| `otro` | Sin coincidencias |
-
-**Cálculo del nivel de confianza:**
-- Base: 50%
-- +25% si hay archivo adjunto
-- +15% si hay palabras clave relevantes
-- +5% si hay 2 o más palabras clave
-- -20% si el motivo tiene menos de 20 caracteres
-- +5% si el motivo tiene 50 o más caracteres
+| Formulario web | HTML5, CSS3, JavaScript (Vanilla) |
+| Automatización | n8n |
+| Modelo de IA | Google Gemini (via n8n LangChain) |
+| Base de datos | Google Sheets |
+| Notificaciones | Telegram Bot API |
+| Exposición local | ngrok |
 
 ---
 
-### 5. `¿Alta Confianza? (≥75%)`
-- **Tipo:** IF (condicional)
-- **Condición:** `nivelConfianza >= 75`
-- **✅ Verdadero →** Decisión Automática
-- **❌ Falso →** Evalúa confianza media
+## 🚀 Instalación y Configuración
+
+### Requisitos previos
+- Instancia de **n8n** activa (self-hosted o cloud).
+- Bot de **Telegram** creado vía [@BotFather](https://t.me/BotFather).
+- Cuenta de **Google** con acceso a Google Sheets y credenciales de API configuradas en n8n.
+- Credenciales de **Google Gemini** configuradas en n8n.
+
+### Pasos
+
+1. **Importar los flujos en n8n:**
+   - Ir a n8n → *Workflows* → *Import from file*.
+   - Importar `flujo_principal.json` y `flujo_confirmacion.json` por separado.
+
+2. **Configurar credenciales en n8n:**
+   - Google Sheets: vincular cuenta de Google con permisos de lectura y escritura.
+   - Google Gemini: agregar API Key de Google AI Studio.
+   - Telegram: agregar el token del bot en las credenciales de n8n.
+
+3. **Configurar la hoja de Google Sheets:**
+   - Crear una hoja con columnas: `id_solicitud`, `nombre`, `id_estudiante`, `correo`, `fecha_ausencia`, `motivo`, `descripcion`, `tiene_archivo`, `clasificacion`, `confianza`, `razonamiento`, `estado`.
+
+4. **Activar los flujos** en n8n y copiar la URL del Webhook del `flujo_principal`.
+
+5. **Configurar el formulario web:**
+   - Editar `envios.js` y reemplazar `WEBHOOK_URL` con la URL del webhook de producción:
+     ```javascript
+     const WEBHOOK_URL = 'https://TU-DOMINIO/webhook/justificacion';
+     ```
+
+6. **Desplegar el formulario** en cualquier servidor web estático (GitHub Pages, Netlify, servidor propio, etc.).
 
 ---
 
-### 6. `Decisión Automática (Alta Confianza)`
-- **Tipo:** Code (JavaScript)
-- **Lógica:**
-  - Si `clasificacionIA === 'valida'` → Estado: **Aprobado** ✅
-  - Si no → Estado: **Rechazado** ❌
-- **Tipo de decisión:** `automatica`
+## 🔒 Consideraciones de Seguridad
+
+- El webhook de n8n debe estar expuesto mediante HTTPS en producción (no usar ngrok en producción).
+- Validar en el backend los tipos y tamaños de archivo recibidos.
+- Restringir el acceso al bot de Telegram únicamente al chat ID del docente autorizado.
+- No exponer credenciales de API en el código fuente del formulario.
 
 ---
 
-### 7. `¿Confianza Media? (≥45%)`
-- **Tipo:** IF (condicional)
-- **Condición:** `nivelConfianza >= 45`
-- **✅ Verdadero →** Enviar a revisión manual
-- **❌ Falso →** Rechazo preventivo
+## 📌 Variables de Entorno Clave
 
----
-
-### 8. `Enviar a Revisión Manual`
-- **Tipo:** Code (JavaScript)
-- **Estado:** `en_revision`
-- **Acción:** Marca la solicitud para revisión manual y alerta al administrador por Telegram.
-
----
-
-### 9. `Rechazo Preventivo (Baja Confianza)`
-- **Tipo:** Code (JavaScript)
-- **Estado:** `rechazado`
-- **Descripción:** Rechaza la solicitud preventivamente por baja confianza (<45%) y solicita documentación válida.
-
----
-
-### 10. `Alertar Admin por Revisión Manual`
-- **Tipo:** Telegram (envío)
-- **Destinatario:** Chat ID `5517523324` (administrador)
-- **Descripción:** Notifica al administrador que hay una solicitud pendiente de revisión manual con los detalles del estudiante.
-
----
-
-### 11. `Preparar Datos para Google Sheets`
-- **Tipo:** Code (JavaScript)
-- **Descripción:** Normaliza y organiza todos los campos para ser guardados en la hoja de cálculo.
-
----
-
-### 12. `Guardar en Google Sheets`
-- **Tipo:** Google Sheets (append)
-- **Hoja:** `Solicitudes`
-- **Columnas registradas:** ID Solicitud, Fecha y Hora, Nombre, ID Estudiante, Correo, Motivo, Tiene Documento, Categoría Detectada, Texto OCR, Clasificación IA, Nivel de Confianza (%), Palabras Clave, Tipo de Decisión, Estado Final.
-
----
-
-### 13. `Notificación Telegram`
-- **Tipo:** Telegram (envío)
-- **Destinatario:** Correo del estudiante usado como Chat ID
-- **Descripción:** Envía al estudiante el resultado completo de su solicitud con el estado final y el nivel de confianza.
-
----
-
-### 14. `Respuesta HTTP - Éxito`
-- **Tipo:** Respond to Webhook
-- **Código:** `200`
-- **Cuerpo:** JSON con `exito: true`, `solicitudId`, `estado` y `nivelConfianza`.
-
----
-
-### 15. `Respuesta HTTP - Error Validación`
-- **Tipo:** Respond to Webhook
-- **Código:** `400`
-- **Cuerpo:** JSON con `exito: false`, lista de `camposFaltantes` y estado de `formatoValido`.
-
----
-
-### 16. `Telegram Bot - Consulta de Estado`
-- **Tipo:** Telegram Trigger
-- **Descripción:** Escucha mensajes entrantes del bot. El estudiante puede consultar el estado de su solicitud enviando su ID.
-
----
-
-### 17. `Procesar Consulta Telegram`
-- **Tipo:** Code (JavaScript)
-- **Comandos disponibles:**
-  - `/estado <ID>` — Consulta el estado de una solicitud
-  - `/historial` — Consulta el historial de solicitudes
-  - `/start` o `/ayuda` — Muestra ayuda
-  - Texto libre — Se interpreta como ID de solicitud
-
----
-
-### 18. `Buscar en Google Sheets`
-- **Tipo:** Google Sheets (lookup)
-- **Búsqueda:** Por columna `ID Solicitud`
-- **Descripción:** Busca la solicitud en el registro para devolver el estado actualizado.
-
----
-
-### 19. `Responder Estado por Telegram`
-- **Tipo:** Telegram (envío)
-- **Descripción:** Responde al estudiante con el estado actual de su solicitud obtenido desde Google Sheets.
-
----
-
-## 🔀 Diagrama de Decisión
-
-```
-Solicitud recibida
-       │
-       ▼
-  ¿Datos válidos?
-   ├── NO → HTTP 400 (campos faltantes)
-   └── SÍ
-        │
-        ▼
-   Análisis IA + OCR
-   (nivel de confianza 0-100%)
-        │
-        ├── ≥ 75% → Decisión Automática
-        │              ├── válida   → APROBADO ✅
-        │              └── inválida → RECHAZADO ❌
-        │
-        ├── 45-74% → Revisión Manual ⏳
-        │              └── Alerta al administrador
-        │
-        └── < 45%  → Rechazo Preventivo ❌
-                       └── Solicita documentación válida
-```
-
----
-
-## 🛠️ Requisitos y Configuración
-
-### Credenciales necesarias
-| Servicio | Credencial |
-|---|---|
-| Google Sheets | OAuth2 (`Google Sheets account 2`) |
-| Telegram | API Token (`Telegram account`) |
-
-### Variables a configurar
 | Variable | Descripción |
 |---|---|
-| `documentId` (Sheets formulario) | ID del Google Sheets de registro de solicitudes |
-| `documentId` (Sheets consulta) | ID del Google Sheets de consulta de estado |
-| Chat ID administrador | ID de Telegram del administrador (`5517523324`) |
-| Webhook path | `/justificacion-inasistencias` |
-
----
-
-## 📊 Estados Posibles de una Solicitud
-
-| Estado | Descripción |
-|---|---|
-| `aprobado` | Justificación aprobada automáticamente (confianza ≥ 75%, clasificación válida) |
-| `rechazado` | Rechazada automáticamente o por baja confianza |
-| `en_revision` | Pendiente de revisión manual por el administrador (confianza 45-74%) |
-| `en_proceso` | Estado inicial al recibir la solicitud |
-
----
-
-## 📁 Estructura de Datos en Google Sheets
-
-| Columna | Descripción |
-|---|---|
-| ID Solicitud | Identificador único `SOL-<timestamp>` |
-| Fecha y Hora | Timestamp ISO de la solicitud |
-| Nombre | Nombre completo del estudiante |
-| ID Estudiante | Identificador institucional |
-| Correo | Correo electrónico |
-| Motivo | Texto de la justificación |
-| Tiene Documento | `Sí` / `No` |
-| Categoría Detectada | Categoría IA de la justificación |
-| Texto OCR | Resultado del análisis del documento |
-| Clasificación IA | `valida` / `dudosa` / `invalida` |
-| Nivel de Confianza (%) | Valor numérico 0-100 |
-| Palabras Clave | Palabras detectadas separadas por coma |
-| Tipo de Decisión | `automatica` / `revision_manual` / `rechazo_preventivo` |
-| Estado Final | Estado definitivo de la solicitud |
-
----
-
-## 🚀 Cómo usar
-
-### Enviar una solicitud (formulario web)
-```bash
-POST https://<tu-instancia-n8n>/webhook/justificacion-inasistencias
-Content-Type: application/json
-
-{
-  "nombre": "Juan Pérez",
-  "estudianteId": "EST-2024-001",
-  "correo": "juan@universidad.edu",
-  "motivo": "Asistí a consulta médica por fiebre alta, adjunto certificado.",
-  "archivo": "<base64>",
-  "tipoArchivo": "image/jpeg"
-}
-```
-
-### Consultar estado por Telegram
-Enviar al bot de Telegram:
-```
-/estado SOL-1714500000000
-```
-o simplemente el ID de la solicitud:
-```
-SOL-1714500000000
-```
-
+| `WEBHOOK_URL` | URL del webhook n8n en producción (en `envios.js`) |
+| Telegram Bot Token | Token del bot configurado en las credenciales de n8n |
+| Google Sheets ID | ID de la hoja de cálculo destino |
+| Gemini API Key | Clave de API de Google AI Studio |
 ---
 
 ## 📝 Notas Adicionales
