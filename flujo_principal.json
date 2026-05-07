@@ -2,6 +2,96 @@
   "nodes": [
     {
       "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                5
+              ],
+              "triggerAtHour": 17
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -592,
+        -480
+      ],
+      "id": "eab9d22a-3cb8-4b9e-a1a9-9a27405406a8",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1JGXb84xauDZ6UMnH6R4PEsCGkcUj-iPMYbUq98VHoGw"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Solicitudes",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -400,
+        -480
+      ],
+      "id": "eb75890a-a961-49b4-936f-19df4370846b",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GdQUHOIWYzYFIlWw",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = items.map(item => item.json);\n\nconst now = new Date();\n\nconst startOfWeek = new Date(now);\nstartOfWeek.setDate(now.getDate() - now.getDay() + 1);\nstartOfWeek.setHours(0,0,0,0);\n\nconst endOfWeek = new Date(startOfWeek);\nendOfWeek.setDate(startOfWeek.getDate() + 6);\nendOfWeek.setHours(23,59,59,999);\n\nconst weeklyRows = rows.filter(row => {\n  const fecha = new Date(row.Fecha_Registro);\n  return fecha >= startOfWeek && fecha <= endOfWeek;\n});\n\nconst total = weeklyRows.length;\nconst validas = weeklyRows.filter(r => r.Clasificacion_IA === 'VALIDA').length;\nconst invalidas = weeklyRows.filter(r => r.Clasificacion_IA === 'INVALIDA').length;\n\nreturn [{\n  json: {\n    total,\n    validas,\n    invalidas\n  }\n}];;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        -480
+      ],
+      "id": "c3796de0-8783-4953-9867-85903e9f858b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "=Resumen Semanal de Inasistencias:  Total procesadas: {{ $json.total }}  Aprobadas: {{ $json.validas }}  Rechazadas: {{ $json.invalidas }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        -480
+      ],
+      "id": "f2595f59-6f30-4941-9d18-0894dbb71b3d",
+      "name": "Send a text message",
+      "webhookId": "cfbd86c1-2f7d-42cf-bac9-5d4dfda9f4f2",
+      "credentials": {
+        "telegramApi": {
+          "id": "6T5dfy6FpW0LwJIK",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
         "httpMethod": "POST",
         "path": "justificacion",
         "responseMode": "responseNode",
@@ -12,10 +102,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        0,
-        112
+        -592,
+        -1024
       ],
-      "id": "04743145-8e21-4ff9-bb50-9728efaa808a",
+      "id": "e379f9e6-f492-4e75-b372-18e5d847967e",
       "name": "Webhook",
       "webhookId": "0e728c6a-a348-4759-8ec2-2f78cf8a3433"
     },
@@ -78,26 +168,26 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        224,
-        112
+        -320,
+        -1024
       ],
-      "id": "74a99009-c109-4cfc-ae92-b42ca2ed51d5",
+      "id": "5d9c44c0-d792-492d-97d3-98e23408483d",
       "name": "Edit Fields"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Eres un sistema de validación académica. Analiza la siguiente solicitud de justificación\nde inasistencia y determina si es válida.\n\nDATOS DEL ESTUDIANTE:\n- Nombre: {{ $json.nombre }}\n- Código: {{ $json.id_estudiante }}\n- Fecha de ausencia: {{ $json.fecha_ausencia }}\n- Motivo seleccionado: {{ $json.motivo }}\n- Descripción del estudiante: {{ $json.descripcion }}\n\nCRITERIOS DE EVALUACIÓN:\n- VÁLIDA: El motivo es legítimo, la descripción es coherente con el motivo declarado,\n  hay consistencia interna y el lenguaje es apropiado.\n- INVÁLIDA: El motivo no justifica una ausencia académica, la descripción es\n  incoherente, contradictoria, vacía o claramente inventada.\n- DUDOSA: Hay elementos que requieren verificación documental o el caso es ambiguo.\n\nResponde ÚNICAMENTE con un objeto JSON con esta estructura exacta (sin texto adicional,\nsin bloques de código, sin explicaciones fuera del JSON):\n{\n  \"clasificacion\": \"VÁLIDA\" o \"INVÁLIDA\" o \"DUDOSA\",\n  \"confianza\": número entre 0.0 y 1.0,\n  \"razonamiento\": \"explicación breve en máximo 2 oraciones\"\n}\n",
+        "text": "=Eres un sistema de validación académica estricto para una institución educativa. Tu tarea es procesar solicitudes de inasistencia y devolver exclusivamente un objeto JSON.\n\n### CONTEXTO DE LA SOLICITUD:\n- Estudiante: {{ $json.body.nombre }} (ID: {{ $json.body.id_estudiante }})\n- Fecha: {{ $json.body.fecha_ausencia }}\n- Categoría: {{ $json.body.motivo }}\n- Descripción: {{ $json.body.descripcion }}\n\n### PROTOCOLO DE EVALUACIÓN:\n1. VALIDA: Solo si existe mención explícita de soporte documental, certificado médico, incapacidad de EPS o autoridad oficial.\n2. INVALIDA: Malestares físicos sin asistencia médica, problemas de transporte, sueño, compromisos sociales o falta de evidencia documental.\n3. DUDOSA: Situaciones de fuerza mayor no médicas (muerte de familiar, trámites legales) o cuando la descripción es insuficiente para decidir.\n\n### REGLAS DE RESPUESTA (CRÍTICAS):\n- Responde ÚNICAMENTE con el objeto JSON. \n- PROHIBIDO usar bloques de código como ```json ```.\n- PROHIBIDO incluir introducciones o explicaciones fuera del JSON.\n- Si los campos de \"Descripción\" o \"Motivo\" están vacíos, clasifica como \"DUDOSA\", confianza 0.0 y solicita los datos en el razonamiento.\n\n### FORMATO REQUERIDO:\n{\n  \"clasificacion\": \"VALIDA\" | \"INVALIDA\" | \"DUDOSA\",\n  \"confianza\": [Número decimal entre 0.0 y 1.0],\n  \"razonamiento\": \"[Máximo 2 oraciones]\"\n}",
         "hasOutputParser": true,
         "batching": {}
       },
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.9,
       "position": [
-        448,
-        -16
+        -128,
+        -1184
       ],
-      "id": "4bfe5550-c162-461a-89ec-c807e52142ba",
+      "id": "bfd74c43-a3d1-4acb-bb93-081917557208",
       "name": "Basic LLM Chain",
       "retryOnFail": true,
       "waitBetweenTries": 3000
@@ -110,30 +200,30 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
       "position": [
-        448,
-        224
+        -128,
+        -912
       ],
-      "id": "37a496c2-75bc-48e5-8efe-bef8960be619",
+      "id": "d0bfa284-15d1-471b-938f-9aa9866d2e01",
       "name": "Google Gemini Chat Model",
       "credentials": {
         "googlePalmApi": {
-          "id": "TW8msl8X2RWaSxbo",
-          "name": "Gemini - Justificaciones"
+          "id": "QJPSww0gDnpYrbEn",
+          "name": "Google Gemini(PaLM) Api account"
         }
       }
     },
     {
       "parameters": {
         "schemaType": "manual",
-        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"clasificacion\": {\n      \"type\": \"string\",\n      \"enum\": [\"VÁLIDA\", \"INVÁLIDA\", \"DUDOSA\"]\n    },\n    \"confianza\": {\n      \"type\": \"number\",\n      \"minimum\": 0,\n      \"maximum\": 1\n    },\n    \"razonamiento\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\"clasificacion\", \"confianza\", \"razonamiento\"]\n}\n"
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"additionalProperties\": false,\n  \"properties\": {\n    \"clasificacion\": {\n      \"type\": \"string\",\n      \"enum\": [\"VALIDA\", \"INVALIDA\", \"DUDOSA\"]\n    },\n    \"confianza\": {\n      \"type\": \"number\",\n      \"minimum\": 0.0,\n      \"maximum\": 1.0\n    },\n    \"razonamiento\": {\n      \"type\": \"string\",\n      \"minLength\": 1,\n      \"maxLength\": 200\n    }\n  },\n  \"required\": [\"clasificacion\", \"confianza\", \"razonamiento\"]\n}"
       },
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        592,
-        224
+        16,
+        -912
       ],
-      "id": "629d68c3-1314-4ec1-bc00-8a5d63190530",
+      "id": "a0a91865-07ac-417a-8e1b-e53399be6524",
       "name": "Structured Output Parser"
     },
     {
@@ -145,15 +235,184 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        800,
-        128
+        192,
+        -1008
       ],
-      "id": "843b7fd7-7d46-43fe-91ae-767e5beb24a4",
+      "id": "48adbc29-46d4-480b-b026-b4dfaa76e709",
       "name": "Merge"
     },
     {
       "parameters": {
-        "operation": "appendOrUpdate",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.Clasificacion_IA }}",
+                    "rightValue": "VALIDA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "77539407-aea2-4e17-88ef-1bd4df58d76c"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cb1201d0-126a-48e1-868f-4b8a807933a9",
+                    "leftValue": "={{ $json.Clasificacion_IA }}",
+                    "rightValue": "INVALIDA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "12f40e91-8959-431f-8b2b-ffeba1d9ef07",
+                    "leftValue": "={{ $json.Clasificacion_IA }}",
+                    "rightValue": "DUDOSA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        864,
+        -1024
+      ],
+      "id": "7c4e1cfa-659c-47bf-bfaf-79c8a9400df7",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "=🔍 SOLICITUD EN REVISIÓN MANUAL (DUDOSA)\n📋 Datos del Estudiante:\n\nNombre: {{ $json.Nombre }}\n\nCódigo: {{ $json.ID_Estudiante }}\n\nFecha de ausencia: {{ $json.Fecha_Ausencia }}\n\nMotivo reportado: {{ $json.Motivo }}\n\nDescripción del alumno: {{ $json.Descripcion }}\n\n🤖 Análisis del Sistema:\n\nClasificación: {{ $json.Clasificacion_IA }}\n\nNivel de Confianza: {{ ($json.Confianza_IA * 100).toFixed(0) }}%\n\nRazonamiento: {{ $json.Razonamiento_IA }}\n\n⚠️ Diagnóstico de Dudoso:\nLa solicitud no menciona explícitamente un comprobante médico (para ser VALIDA), pero tampoco confiesa una falta de soporte o un motivo trivial (para ser INVALIDA). Se encuentra en un área gris que requiere criterio humano.\n\n📎 Acciones Pendientes:\n\nRevisar: ¿La situación descrita amerita excepción sin soporte?\n\nContactar: Solicitar el documento adjunto si el estudiante olvidó subirlo.\n\nDecidir: Cambiar estado a Aprobado o Rechazado en el sistema.\n\n📌 ID de Gestión: {{ $json.ID_Solicitud }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ VÁLIDA",
+                    "additionalFields": {
+                      "callback_data": "=VALIDA_{{ $json.id_solicitud }}"
+                    }
+                  },
+                  {
+                    "text": "❌ INVÁLIDA",
+                    "additionalFields": {
+                      "callback_data": "=INVALIDA_{{ $json.id_solicitud }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        -816
+      ],
+      "id": "37d23571-6910-487a-bae0-16baed5c3569",
+      "name": "Send a text message4",
+      "webhookId": "6351bc06-09e6-4613-9e11-1a9452f8ee8a",
+      "credentials": {
+        "telegramApi": {
+          "id": "6T5dfy6FpW0LwJIK",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n    \"id_solicitud\": \"{{ $json.id_solicitud }}\",\n    \"mensaje\": \"Solicitud recibida. Te notificaremos pronto por Telegram.\"\n\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        640,
+        -1008
+      ],
+      "id": "f58b93f3-bb2f-48e8-9e66-0af034ef37a1",
+      "name": "Response Code: 1"
+    },
+    {
+      "parameters": {
+        "chatId": "5517523324",
+        "text": "=❌ *NOTIFICACIÓN DE SOLICITUD RECHAZADA*\n\n*Datos del Estudiante:*\n• *Nombre:* {{ $json.Nombre }}\n• *Código:* {{ $json.ID_Estudiante }}\n• *Fecha:* {{ $json.Fecha_Ausencia }}\n\n*Resultado de la Evaluación:*\n• *Estado:* {{ $json.Clasificacion_IA }}\n• *Confianza:* {{ (Number($json.Confianza_IA) * 100).toFixed(0) }}%\n\n*Análisis del Sistema:*\n{{ $json.Razonamiento_IA }}\n\n*Observación:*\nEsta solicitud se rechazó porque la descripción no menciona soporte médico formal. El malestar físico sin evidencia documental no constituye una falta justificada.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        -1008
+      ],
+      "id": "961bfd2b-508e-49a4-91fc-6704bb1e6636",
+      "name": "Send a text message5",
+      "webhookId": "cc217b62-af57-420a-90c4-56d4921fd236",
+      "credentials": {
+        "telegramApi": {
+          "id": "6T5dfy6FpW0LwJIK",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
         "documentId": {
           "__rl": true,
           "value": "1JGXb84xauDZ6UMnH6R4PEsCGkcUj-iPMYbUq98VHoGw",
@@ -314,6 +573,16 @@
               "type": "string",
               "canBeUsedToMatch": true,
               "removed": false
+            },
+            {
+              "id": "Prioridad",
+              "displayName": "Prioridad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
             }
           ],
           "attemptToConvertTypes": false,
@@ -324,217 +593,85 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        1024,
-        128
+        416,
+        -1008
       ],
-      "id": "b7d41bc7-0de5-4c9e-b940-4ed976e12851",
-      "name": "Append or update row in sheet",
+      "id": "612b2d36-20fa-4a78-bad8-13e4a631e5ff",
+      "name": "Append row in sheet1",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "u4WIrXsiqUntBF7Y",
-          "name": "Google Sheets - Justificaciones"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "rules": {
-          "values": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.Clasificacion_IA }}",
-                    "rightValue": "VALIDA",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    },
-                    "id": "77539407-aea2-4e17-88ef-1bd4df58d76c"
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "cb1201d0-126a-48e1-868f-4b8a807933a9",
-                    "leftValue": "={{ $json.Clasificacion_IA }}",
-                    "rightValue": "INVÁLIDA",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals",
-                      "name": "filter.operator.equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
-                    "id": "12f40e91-8959-431f-8b2b-ffeba1d9ef07",
-                    "leftValue": "={{ $json.Clasificacion_IA }}",
-                    "rightValue": "DUDOSA",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals",
-                      "name": "filter.operator.equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              }
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.4,
-      "position": [
-        1472,
-        96
-      ],
-      "id": "fcf9a76f-4d21-4297-acb2-8955d079e502",
-      "name": "Switch"
-    },
-    {
-      "parameters": {
-        "operation": "sendAndWait",
-        "chatId": "5517523324",
-        "message": "=  ✅ Solicitud APROBADA automáticamente\n  ID: {{ $json.id_solicitud }}\n  Estudiante: {{ $json.nombre }} ({{ $json.id_estudiante }})\n  Motivo: {{ $json.motivo }}\n  Confianza IA: {{ ($json.confianza * 100).toFixed(0) }}%\n",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        1696,
-        -64
-      ],
-      "id": "211d3c19-76eb-4d12-9662-701143c46ea8",
-      "name": "Send message and wait for response",
-      "webhookId": "22dcad21-7814-42c1-b7bb-4aead7dd16aa",
-      "credentials": {
-        "telegramApi": {
-          "id": "ehobeJkvwlIjt0AM",
-          "name": "Telegram Bot - Justificaciones"
+          "id": "GdQUHOIWYzYFIlWw",
+          "name": "Google Sheets account"
         }
       }
     },
     {
       "parameters": {
         "chatId": "5517523324",
-        "text": "=🔍 *SOLICITUD REQUIERE REVISIÓN MANUAL*  📋 *Datos del Estudiante:* - Nombre: {{ $json.nombre }} - Código: {{ $json.id_estudiante }} - Fecha de ausencia: {{ $json.fecha_ausencia }} - Motivo: {{ $json.motivo }} - Descripción: {{ $json.descripcion }}  🤖 *Análisis de IA:* - Clasificación: {{ $json.clasificacion }} - Confianza: {{ $json.confianza }} - Razonamiento: {{ $json.razonamiento }}  📌 ID Solicitud: `{{ $json.id_solicitud }}`  Por favor revisa y decide:",
-        "replyMarkup": "inlineKeyboard",
-        "inlineKeyboard": {
-          "rows": [
-            {
-              "row": {
-                "buttons": [
-                  {
-                    "text": "✅ VÁLIDA",
-                    "additionalFields": {
-                      "callback_data": "=VALIDA_{{ $json.id_solicitud }}"
-                    }
-                  },
-                  {
-                    "text": "❌ INVÁLIDA",
-                    "additionalFields": {
-                      "callback_data": "=INVALIDA_{{ $json.id_solicitud }}"
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        "additionalFields": {
-          "parse_mode": "MarkdownV2"
-        }
-      },
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        1696,
-        288
-      ],
-      "id": "414f22ac-c75e-4aca-80ab-a5fbf2389b02",
-      "name": "Send a text message",
-      "webhookId": "6351bc06-09e6-4613-9e11-1a9452f8ee8a",
-      "credentials": {
-        "telegramApi": {
-          "id": "ehobeJkvwlIjt0AM",
-          "name": "Telegram Bot - Justificaciones"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\n    \"id_solicitud\": \"{{ $json.id_solicitud }}\",\n    \"mensaje\": \"Solicitud recibida. Te notificaremos pronto por Telegram.\"\n\n}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        1248,
-        128
-      ],
-      "id": "24324631-e86d-4e28-8f1d-db269e3bb47b",
-      "name": "Response Code: 200"
-    },
-    {
-      "parameters": {
-        "chatId": "5517523324",
-        "text": "a",
+        "text": "={{ $json.Clasificacion_IA === 'VALIDA' ?  `✅ *SOLICITUD APROBADA AUTOMÁTICAMENTE*  *🆔 ID:* ${$json.ID_Solicitud} *👤 Estudiante:* ${$json.Nombre} (${$json.ID_Estudiante}) *📅 Fecha:* ${$json.Fecha_Ausencia} *🤖 Razonamiento:* ${$json.Razonamiento_IA}  *📊 Confianza:* ${(Number($json.Confianza_IA) * 100).toFixed(0)}%`  : '' }}",
         "additionalFields": {}
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1696,
-        112
+        1088,
+        -1200
       ],
-      "id": "0ac0a106-dc56-4395-8ae6-d4e1c8a5d869",
+      "id": "96b88d7d-7a25-4dfe-aa69-ba417fe649e3",
       "name": "Send a text message1",
-      "webhookId": "cc217b62-af57-420a-90c4-56d4921fd236",
+      "webhookId": "22dcad21-7814-42c1-b7bb-4aead7dd16aa",
       "credentials": {
         "telegramApi": {
-          "id": "ehobeJkvwlIjt0AM",
-          "name": "Telegram Bot - Justificaciones"
+          "id": "6T5dfy6FpW0LwJIK",
+          "name": "Telegram account"
         }
       }
     }
   ],
   "connections": {
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Webhook": {
       "main": [
         [
           {
             "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Basic LLM Chain",
             "type": "main",
             "index": 0
           }
@@ -594,18 +731,7 @@
       "main": [
         [
           {
-            "node": "Append or update row in sheet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Append or update row in sheet": {
-      "main": [
-        [
-          {
-            "node": "Response Code: 200",
+            "node": "Append row in sheet1",
             "type": "main",
             "index": 0
           }
@@ -616,13 +742,6 @@
       "main": [
         [
           {
-            "node": "Send message and wait for response",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Send a text message1",
             "type": "main",
             "index": 0
@@ -630,18 +749,36 @@
         ],
         [
           {
-            "node": "Send a text message",
+            "node": "Send a text message5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message4",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Response Code: 200": {
+    "Response Code: 1": {
       "main": [
         [
           {
             "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Response Code: 1",
             "type": "main",
             "index": 0
           }
@@ -652,6 +789,6 @@
   "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "0fc89089b1b32e61bfb3aeb62c37f96b035decd3ff5a8cff5d570135ebd5b86b"
+    "instanceId": "28305f66da7d75787708eb8f0e3d9b402dc05bb7df5e8d088450151053ed9207"
   }
 }
