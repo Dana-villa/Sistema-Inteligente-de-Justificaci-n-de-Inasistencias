@@ -1,6 +1,6 @@
 // ─── CONFIGURACIÓN ──────────────────────────────────────────────────────────
 // Reemplaza esta URL con la URL de tu webhook de n8n en modo PRODUCCIÓN
-const WEBHOOK_URL = 'https://garage-passion-scholar.ngrok-free.dev/webhook/justificacion';
+const WEBHOOK_URL = 'https://garage-passion-scholar.ngrok-free.dev/webhook-test/justificacion';
 
 // ─── REFERENCIAS DOM ────────────────────────────────────────────────────────
 const formulario = document.getElementById('formulario-justificacion');
