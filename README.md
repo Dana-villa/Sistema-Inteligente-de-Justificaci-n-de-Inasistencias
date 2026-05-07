@@ -154,10 +154,3 @@ Al enviarse con éxito, el formulario muestra el `id_solicitud` generado e infor
 | Telegram Bot Token | Token del bot configurado en las credenciales de n8n |
 | Google Sheets ID | ID de la hoja de cálculo destino |
 | Gemini API Key | Clave de API de Google AI Studio |
----
-
-## 📝 Notas Adicionales
-
-- El análisis OCR es **simulado** mediante detección de palabras clave. Para producción se recomienda integrar un servicio real de OCR (Google Vision API, Tesseract, etc.).
-- El campo `chatId` en la notificación al estudiante usa el correo como identificador; en producción debe reemplazarse por el Chat ID real de Telegram del estudiante.
-- El flujo es fácilmente extensible para agregar notificaciones por correo electrónico usando el nodo de Gmail o SMTP.
